@@ -1,6 +1,29 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question } from '../types';
 
+/**
+ * Selects a random unit from the syllabus to reduce prompt size.
+ * This helps prevent API errors due to overly large prompts.
+ * @param syllabus The full syllabus string.
+ * @returns A string containing a single random unit from the syllabus.
+ */
+const getRandomSyllabusUnit = (syllabus: string): string => {
+    // This regex splits the syllabus by units, like "Unit-I" or "Unit - 1".
+    const units = syllabus.split(/Unit[ -]/);
+    
+    // The first element of the split is an empty string because the syllabus starts with "Unit".
+    const actualUnits = units.slice(1);
+
+    if (actualUnits.length > 0) {
+        const randomIndex = Math.floor(Math.random() * actualUnits.length);
+        // We add "Unit -" back for context for the model. The unit content starts with its number/numeral.
+        return 'Unit - ' + actualUnits[randomIndex].trim();
+    }
+
+    return syllabus; // Fallback to the full syllabus if splitting fails.
+};
+
+
 const generateQuestions = async (syllabus: string, count: number, subject: string): Promise<Question[]> => {
   if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable not set");
@@ -9,11 +32,14 @@ const generateQuestions = async (syllabus: string, count: number, subject: strin
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const prompt = `Based on the provided UGC NET syllabus for ${subject}, generate ${count} multiple-choice questions (MCQs). For each question and its four options, provide the text in BOTH English (en) and Hindi (hi). There should be only one correct answer per question. The difficulty should be appropriate for a national eligibility test. Do not repeat questions.
+    const syllabusSnippet = getRandomSyllabusUnit(syllabus);
     
-    Syllabus:
+    const pluralizedQuestion = count === 1 ? "question (MCQ)" : "questions (MCQs)";
+    const prompt = `Based on the provided UGC NET syllabus unit for ${subject}, generate ${count} multiple-choice ${pluralizedQuestion}. For each question and its four options, provide the text in BOTH English (en) and Hindi (hi). There should be only one correct answer per question. The difficulty should be appropriate for a national eligibility test. Do not repeat questions.
+    
+    Syllabus Unit:
     ---
-    ${syllabus}
+    ${syllabusSnippet}
     ---
     
     Return the output as a JSON array of objects, following the specified schema. Ensure the Hindi translations are accurate and natural.`;
