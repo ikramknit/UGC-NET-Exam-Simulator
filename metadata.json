@@ -1,0 +1,5 @@
+{
+  "name": "UGC NET Exam Simulator",
+  "description": "An online exam system that simulates the UGC NET pattern for Paper 1 (General) and Paper 2 (Computer Science). It features a real-time timer, a question palette for easy navigation, and provides a detailed score report upon completion. Questions are dynamically generated based on the official syllabus.",
+  "requestFramePermissions": []
+}
