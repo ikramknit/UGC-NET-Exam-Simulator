@@ -1,13 +1,12 @@
-
 import React from 'react';
-import { QuestionStatus } from '../types';
+import { Question, QuestionStatus } from '../types';
 import { PAPER1_QUESTION_COUNT, TOTAL_QUESTIONS } from '../constants';
 
 interface QuestionPaletteProps {
     statuses: QuestionStatus[];
     currentIndex: number;
     jumpToQuestion: (index: number) => void;
-    loadedQuestionCount: number;
+    questions: (Question | null)[];
 }
 
 const getStatusColor = (status: QuestionStatus, isCurrent: boolean): string => {
@@ -27,17 +26,17 @@ const getStatusColor = (status: QuestionStatus, isCurrent: boolean): string => {
     }
 };
 
-const QuestionPalette: React.FC<QuestionPaletteProps> = ({ statuses, currentIndex, jumpToQuestion, loadedQuestionCount }) => {
+const QuestionPalette: React.FC<QuestionPaletteProps> = ({ statuses, currentIndex, jumpToQuestion, questions }) => {
     const renderPaletteSection = (start: number, count: number) => {
         return Array.from({ length: count }, (_, i) => start + i).map(index => {
-            const isLoaded = index < loadedQuestionCount;
+            const isLoaded = questions[index] !== null;
             const status = statuses[index];
             
             let buttonClass = 'w-8 h-8 flex items-center justify-center rounded-md text-sm font-semibold border transition-colors duration-200';
             if (isLoaded) {
                 buttonClass += ` ${getStatusColor(status, index === currentIndex)}`;
             } else {
-                buttonClass += ' bg-gray-300 text-gray-500 cursor-not-allowed border-gray-400 opacity-70';
+                buttonClass += ' bg-gray-300 text-gray-500 cursor-not-allowed border-gray-400 opacity-70 animate-pulse';
             }
 
             return (
@@ -78,7 +77,7 @@ const QuestionPalette: React.FC<QuestionPaletteProps> = ({ statuses, currentInde
                 <div className="flex items-center"><span className="w-4 h-4 rounded-full bg-purple-500 mr-2"></span> Marked for Review</div>
                 <div className="flex items-center"><span className="w-4 h-4 rounded-full bg-gray-200 mr-2 border border-gray-400"></span> Not Visited</div>
                 <div className="flex items-center"><span className="w-4 h-4 rounded-full bg-blue-600 mr-2"></span> Current</div>
-                <div className="flex items-center"><span className="w-4 h-4 rounded-full bg-gray-300 mr-2 border border-gray-400"></span> Loading</div>
+                <div className="flex items-center"><span className="w-4 h-4 rounded-full bg-gray-300 mr-2 border border-gray-400 animate-pulse"></span> Loading</div>
             </div>
         </div>
     );

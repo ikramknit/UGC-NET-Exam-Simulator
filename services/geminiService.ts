@@ -85,7 +85,14 @@ const generateQuestions = async (syllabus: string, count: number, subject: strin
       }
     });
 
-    const jsonText = response.text.trim();
+    let jsonText = response.text.trim();
+
+    // The model might wrap the JSON in markdown backticks. Let's strip them.
+    const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch && jsonMatch[1]) {
+        jsonText = jsonMatch[1];
+    }
+    
     const generatedQuestions = JSON.parse(jsonText);
 
     if (!Array.isArray(generatedQuestions) || generatedQuestions.length === 0) {

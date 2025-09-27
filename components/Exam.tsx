@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Question, QuestionStatus, Language } from '../types';
 import { TOTAL_TIME_SECONDS, PAPER1_QUESTION_COUNT, TOTAL_QUESTIONS, UGC_NET_EXAM_STATE_KEY } from '../constants';
 import Timer from './Timer';
 import QuestionPalette from './QuestionPalette';
 
 interface ExamProps {
-    questions: Question[];
+    questions: (Question | null)[];
     onSubmit: (answers: (number | null)[]) => void;
 }
 
@@ -27,7 +27,7 @@ const Exam: React.FC<ExamProps> = ({ questions, onSubmit }) => {
     }, []);
 
     const [currentIndex, setCurrentIndex] = useState(() => loadState()?.currentIndex || 0);
-    const [answers, setAnswers] = useState<(number | null)[]>(() => loadState()?.answers || Array(questions.length).fill(null));
+    const [answers, setAnswers] = useState<(number | null)[]>(() => loadState()?.answers || Array(TOTAL_QUESTIONS).fill(null));
     const [statuses, setStatuses] = useState<QuestionStatus[]>(() => {
         const savedStatuses = loadState()?.statuses;
         const initialStatuses = Array(TOTAL_QUESTIONS).fill(QuestionStatus.NotVisited);
@@ -49,10 +49,11 @@ const Exam: React.FC<ExamProps> = ({ questions, onSubmit }) => {
         onSubmit(answers);
     }, [answers, onSubmit]);
 
+    const loadedQuestionCount = useMemo(() => questions.filter(q => q !== null).length, [questions]);
+
     const handleManualSubmitClick = () => {
         const answeredCount = answers.filter(a => a !== null && a !== undefined).length;
-        const totalAttemptableQuestions = questions.length;
-        const confirmationMessage = `You have attempted ${answeredCount} out of ${totalAttemptableQuestions} loaded questions.\n\nAre you sure you want to submit the exam? This action cannot be undone.`;
+        const confirmationMessage = `You have attempted ${answeredCount} out of ${loadedQuestionCount} loaded questions.\n\nAre you sure you want to submit the exam? This action cannot be undone.`;
 
         if (window.confirm(confirmationMessage)) {
             performSubmit();
@@ -79,21 +80,11 @@ const Exam: React.FC<ExamProps> = ({ questions, onSubmit }) => {
     }, [performSubmit]);
 
     useEffect(() => {
-        const targetLength = questions.length;
-        if (targetLength > 0 && answers.length < targetLength) {
-             setAnswers(currentAnswers => {
-                const diff = targetLength - currentAnswers.length;
-                return [...currentAnswers, ...Array(diff).fill(null)];
-            });
-        }
-    }, [questions.length, answers.length]);
-
-    useEffect(() => {
-        if (questions.length > 0 && statuses[0] === QuestionStatus.NotVisited && !loadState()) {
+        if (questions.length > 0 && questions[0] && statuses[0] === QuestionStatus.NotVisited && !loadState()) {
              updateStatus(0, QuestionStatus.NotAnswered);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [questions.length]);
+    }, [questions]);
 
     const updateStatus = (index: number, newStatus: QuestionStatus) => {
         setStatuses(prev => {
@@ -106,17 +97,17 @@ const Exam: React.FC<ExamProps> = ({ questions, onSubmit }) => {
     };
     
     const jumpToQuestion = (index: number) => {
-        if (index >= 0 && index < questions.length) {
+        if (index >= 0 && index < TOTAL_QUESTIONS) {
             setCurrentIndex(index);
             setActivePaper(index < PAPER1_QUESTION_COUNT ? 1 : 2);
-            if (statuses[index] === QuestionStatus.NotVisited) {
+            if (questions[index] && statuses[index] === QuestionStatus.NotVisited) {
                 updateStatus(index, QuestionStatus.NotAnswered);
             }
         }
     };
     
     const handleNext = () => {
-        if (currentIndex < questions.length - 1) {
+        if (currentIndex < TOTAL_QUESTIONS - 1) {
             jumpToQuestion(currentIndex + 1);
         }
     };
@@ -162,23 +153,23 @@ const Exam: React.FC<ExamProps> = ({ questions, onSubmit }) => {
         setActivePaper(paper);
         if (paper === 1) {
             jumpToQuestion(0);
-        } else if (questions.length > PAPER1_QUESTION_COUNT) {
+        } else {
             jumpToQuestion(PAPER1_QUESTION_COUNT);
         }
     }
 
     const isPaper2Ready = questions.length > PAPER1_QUESTION_COUNT;
-    const isFullyLoaded = questions.length === TOTAL_QUESTIONS;
+    const isFullyLoaded = loadedQuestionCount === TOTAL_QUESTIONS;
     const currentQuestion = questions[currentIndex];
 
     if (!currentQuestion) {
         return (
-            <div className="flex items-center justify-center h-screen">
+            <div className="flex items-center justify-center h-screen bg-white">
                 <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span className="ml-4 text-gray-700 text-xl">Loading Question...</span>
+                <span className="ml-4 text-gray-700 text-xl">Loading Question {currentIndex + 1}... Please wait.</span>
             </div>
         );
     }
@@ -199,9 +190,9 @@ const Exam: React.FC<ExamProps> = ({ questions, onSubmit }) => {
                 <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md flex flex-col">
                     <div className="flex border-b">
                         <button onClick={() => switchPaper(1)} className={`py-2 px-4 font-semibold ${activePaper === 1 ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}>Paper 1: Teaching & Research Aptitude</button>
-                        <button onClick={() => switchPaper(2)} className={`py-2 px-4 font-semibold flex items-center gap-2 ${activePaper === 2 ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'} ${!isPaper2Ready ? 'cursor-not-allowed opacity-50' : ''}`} disabled={!isPaper2Ready}>
+                        <button onClick={() => switchPaper(2)} className={`py-2 px-4 font-semibold flex items-center gap-2 ${activePaper === 2 ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'} ${!isPaper2Ready ? 'opacity-50' : ''}`}>
                            Paper 2: Computer Science
-                           {questions.length < TOTAL_QUESTIONS && activePaper === 2 && (
+                           {loadedQuestionCount < TOTAL_QUESTIONS && activePaper === 2 && (
                                 <svg className="animate-spin -ml-1 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -211,7 +202,7 @@ const Exam: React.FC<ExamProps> = ({ questions, onSubmit }) => {
                     </div>
                     <div className="flex justify-between items-center pt-4 mb-4">
                        <h2 className="text-xl font-semibold text-blue-700">Question {currentIndex + 1}</h2>
-                       <p className="text-gray-600 font-medium">Loaded Questions: {questions.length}/{TOTAL_QUESTIONS}</p>
+                       <p className="text-gray-600 font-medium">Loaded Questions: {loadedQuestionCount}/{TOTAL_QUESTIONS}</p>
                     </div>
                     <div className="flex-grow">
                         <p className="text-lg text-gray-800 mb-6 whitespace-pre-wrap">{currentQuestion.question[language]}</p>
@@ -238,7 +229,7 @@ const Exam: React.FC<ExamProps> = ({ questions, onSubmit }) => {
                 </div>
 
                 <div className="lg:col-span-1 space-y-8">
-                    <QuestionPalette statuses={statuses} currentIndex={currentIndex} jumpToQuestion={jumpToQuestion} loadedQuestionCount={questions.length} />
+                    <QuestionPalette statuses={statuses} currentIndex={currentIndex} jumpToQuestion={jumpToQuestion} questions={questions} />
                      <button 
                         onClick={handleManualSubmitClick} 
                         disabled={!isFullyLoaded}
@@ -248,7 +239,7 @@ const Exam: React.FC<ExamProps> = ({ questions, onSubmit }) => {
                             : 'bg-green-600 hover:bg-green-700'
                         }`}
                      >
-                        {isFullyLoaded ? 'SUBMIT EXAM' : `Loading... (${questions.length}/${TOTAL_QUESTIONS})`}
+                        {isFullyLoaded ? 'SUBMIT EXAM' : `Loading... (${loadedQuestionCount}/${TOTAL_QUESTIONS})`}
                     </button>
                 </div>
             </main>

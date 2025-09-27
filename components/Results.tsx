@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Question, Language } from '../types';
-import { MARKS_PER_QUESTION, TOTAL_QUESTIONS } from '../constants';
+import { MARKS_PER_QUESTION } from '../constants';
 
 interface ResultsProps {
-    questions: Question[];
+    questions: (Question | null)[];
     userAnswers: (number | null)[];
     onRestart: () => void;
 }
@@ -11,13 +11,19 @@ interface ResultsProps {
 const Results: React.FC<ResultsProps> = ({ questions, userAnswers, onRestart }) => {
     const [language, setLanguage] = useState<Language>('en');
 
-    const { score, correct, incorrect, unattempted } = useMemo(() => {
+    const { score, correct, incorrect, unattempted, loadedQuestionCount } = useMemo(() => {
         let score = 0;
         let correct = 0;
         let incorrect = 0;
         let unattempted = 0;
+        let loadedQuestionCount = 0;
 
         questions.forEach((q, index) => {
+            if (q === null) {
+                return; // Skip questions that failed to load
+            }
+            loadedQuestionCount++;
+
             const userAnswer = userAnswers[index];
             if (userAnswer === null || userAnswer === undefined) {
                 unattempted++;
@@ -29,16 +35,16 @@ const Results: React.FC<ResultsProps> = ({ questions, userAnswers, onRestart }) 
             }
         });
 
-        return { score, correct, incorrect, unattempted };
+        return { score, correct, incorrect, unattempted, loadedQuestionCount };
     }, [questions, userAnswers]);
 
-    const totalMarks = TOTAL_QUESTIONS * MARKS_PER_QUESTION;
+    const totalMarks = loadedQuestionCount * MARKS_PER_QUESTION;
 
     return (
         <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
             <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl p-8">
                 <h1 className="text-4xl font-extrabold text-center text-gray-800 mb-4">Exam Results</h1>
-                <p className="text-center text-gray-500 mb-8">Here's your performance summary.</p>
+                <p className="text-center text-gray-500 mb-8">Here's your performance summary based on {loadedQuestionCount} loaded questions.</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center mb-10">
                     <div className="bg-blue-100 p-6 rounded-xl">
@@ -47,7 +53,7 @@ const Results: React.FC<ResultsProps> = ({ questions, userAnswers, onRestart }) 
                     </div>
                      <div className="bg-green-100 p-6 rounded-xl">
                         <p className="text-lg font-semibold text-green-800">Percentage</p>
-                        <p className="text-5xl font-bold text-green-600">{((score / totalMarks) * 100).toFixed(2)}%</p>
+                        <p className="text-5xl font-bold text-green-600">{totalMarks > 0 ? ((score / totalMarks) * 100).toFixed(2) : '0.00'}%</p>
                     </div>
                 </div>
 
@@ -75,21 +81,24 @@ const Results: React.FC<ResultsProps> = ({ questions, userAnswers, onRestart }) 
                 </div>
 
                 <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-4">
-                    {questions.map((q, index) => (
-                        <div key={index} className="p-4 border rounded-lg bg-gray-50">
-                            <p className="font-semibold text-gray-800 mb-2">Q{index + 1}: {q.question[language]}</p>
-                            <div className="space-y-1 text-sm">
-                                <p className={`p-2 rounded ${userAnswers[index] === q.answer ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                    Your Answer: <span className="font-medium">{userAnswers[index] !== null && userAnswers[index] !== undefined ? q.options[userAnswers[index] as number][language] : 'Not Answered'}</span>
-                                </p>
-                                {userAnswers[index] !== q.answer && (
-                                    <p className="p-2 rounded bg-green-100 text-green-800">
-                                        Correct Answer: <span className="font-medium">{q.options[q.answer][language]}</span>
+                    {questions.map((q, index) => {
+                        if (q === null) return null;
+                        return (
+                            <div key={index} className="p-4 border rounded-lg bg-gray-50">
+                                <p className="font-semibold text-gray-800 mb-2">Q{index + 1}: {q.question[language]}</p>
+                                <div className="space-y-1 text-sm">
+                                    <p className={`p-2 rounded ${userAnswers[index] === q.answer ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        Your Answer: <span className="font-medium">{userAnswers[index] !== null && userAnswers[index] !== undefined ? q.options[userAnswers[index] as number][language] : 'Not Answered'}</span>
                                     </p>
-                                )}
+                                    {userAnswers[index] !== q.answer && (
+                                        <p className="p-2 rounded bg-green-100 text-green-800">
+                                            Correct Answer: <span className="font-medium">{q.options[q.answer][language]}</span>
+                                        </p>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                  <div className="text-center mt-10">

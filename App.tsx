@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Question, ExamState } from './types';
 import { generateQuestions } from './services/geminiService';
 import Exam from './components/Exam';
@@ -44,37 +43,48 @@ const StartScreen: React.FC<{ onStart: () => void }> = ({ onStart }) => (
 
 const App: React.FC = () => {
     const [examState, setExamState] = useState<ExamState>(ExamState.Start);
-    const [questions, setQuestions] = useState<Question[]>([]);
+    const [questions, setQuestions] = useState<(Question | null)[]>([]);
     const [loadingMessage, setLoadingMessage] = useState<string>('');
     const [finalAnswers, setFinalAnswers] = useState<(number | null)[]>([]);
 
     const streamLoadQuestions = useCallback(async () => {
         setLoadingMessage('Preparing the first question to start the exam...');
+        setQuestions(Array(TOTAL_QUESTIONS).fill(null));
 
-        // Helper to fetch a single question and update state
-        const fetchAndSetQuestion = async (index: number) => {
+        const fetchAndSetQuestion = async (index: number, retries = 2) => {
             const isPaper1 = index < PAPER1_QUESTION_COUNT;
             const syllabus = isPaper1 ? SYLLABUS_PAPER_1 : SYLLABUS_PAPER_2;
             const subject = isPaper1 ? "Teaching & Research Aptitude" : "Computer Science";
             
-            const newQuestion = await generateQuestions(syllabus, 1, subject);
-            setQuestions(prev => [...prev, ...newQuestion]);
+            try {
+                const [newQuestion] = await generateQuestions(syllabus, 1, subject);
+                setQuestions(prev => {
+                    const newQuestions = [...prev];
+                    newQuestions[index] = newQuestion;
+                    return newQuestions;
+                });
+            } catch (error) {
+                 if (retries > 0) {
+                    console.warn(`Retrying to fetch question #${index + 1}. Retries left: ${retries - 1}`);
+                    await new Promise(res => setTimeout(res, 1500));
+                    await fetchAndSetQuestion(index, retries - 1);
+                } else {
+                    console.error(`Failed to fetch question #${index + 1} after multiple retries.`);
+                    throw error;
+                }
+            }
         };
 
         try {
-            // Fetch the first question to start the exam
             await fetchAndSetQuestion(0);
-            setExamState(ExamState.Ongoing); // Start the exam now!
+            setExamState(ExamState.Ongoing);
 
-            // Fetch the rest of the questions one by one in the background
+            // Fetch the rest of the questions in parallel in the background
             for (let i = 1; i < TOTAL_QUESTIONS; i++) {
-                try {
-                    await fetchAndSetQuestion(i);
-                } catch (questionError) {
+                 fetchAndSetQuestion(i).catch(questionError => {
                     console.error(`Failed to load question #${i + 1}:`, questionError);
-                    // Alert the user about the non-critical error
                     setTimeout(() => alert(`Warning: Question ${i + 1} could not be loaded. You can continue with the available questions.`), 500);
-                }
+                });
             }
         } catch (initialError) {
             console.error("Failed to start the exam:", initialError);
